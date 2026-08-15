@@ -105,6 +105,13 @@ export function ensureFreeMarker(
 }
 
 export function stripSampling(body: Record<string, unknown>): Record<string, unknown> {
-  const omit = new Set(["temperature", "top_p", "max_tokens", "tools", "tool_choice"]);
+  const omit = new Set([
+    "temperature",
+    "top_p",
+    "max_tokens",
+    "tools",
+    "tool_choice",
+    "parallel_tool_calls",
+  ]);
   return Object.fromEntries(Object.entries(body).filter(([key]) => !omit.has(key)));
 }

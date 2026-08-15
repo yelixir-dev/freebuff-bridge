@@ -216,7 +216,7 @@ Use `BRIDGE_API_KEY` as the client API key.
 - Active sessions are heartbeated before reuse.
 - Retryable failures before visible output can fail over to another credential.
 
-This is not the complete OpenAI API. The bridge preserves prior assistant `tool_calls` and matching tool-result messages, but Freebuff free-mode cannot safely execute arbitrary client tools. Requests containing `tools` must set `tool_choice: "none"`; active tool selection returns a clear `400` instead of silently changing semantics. Sampling fields and `max_tokens` are removed before forwarding.
+This is not the complete OpenAI API. The bridge adapts OpenAI function definitions to Freebuff's XML tool protocol, converts complete XML calls back to canonical `tool_calls`, preserves matching tool-result history, and supports `auto`, `required`, named selection, parallel calls, and streaming clients. Tool-enabled streaming requests use a validated non-streaming Freebuff response and emit indexed OpenAI SSE deltas, because the current free-model provider endpoints do not accept native OpenAI tools. Sampling fields and `max_tokens` are removed before forwarding.
 
 ## Security and persistence
 

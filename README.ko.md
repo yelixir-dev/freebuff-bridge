@@ -216,7 +216,7 @@ http://호스트또는IP:9993/v1
 - 활성 세션은 재사용 전에 heartbeat로 확인한다.
 - 사용자에게 출력하기 전 발생한 재시도 가능 오류는 다른 계정으로 넘길 수 있다.
 
-완전한 OpenAI API 구현은 아니다. 이전 assistant `tool_calls`와 대응하는 tool-result 메시지는 보존하지만, Freebuff free-mode는 임의의 클라이언트 도구를 안전하게 실행할 수 없다. `tools`를 보내는 요청은 `tool_choice: "none"`이어야 한다. 활성 도구 선택은 의미를 몰래 바꾸지 않고 명확한 `400`으로 거부한다. 샘플링 필드와 `max_tokens`는 전달 전에 제거한다.
+완전한 OpenAI API 구현은 아니다. 브릿지는 OpenAI 함수 정의를 Freebuff XML 툴 프로토콜로 변환하고, 완성된 XML 호출을 표준 `tool_calls`로 되돌리며, 대응하는 tool-result 이력을 보존한다. `auto`, `required`, 함수 지정, 병렬 호출, 스트리밍 클라이언트를 지원한다. 현재 무료 모델 provider는 OpenAI 네이티브 도구를 받지 않으므로, 도구가 활성화된 스트리밍 요청은 검증된 Freebuff 비스트리밍 응답을 받은 뒤 인덱스가 포함된 OpenAI SSE 델타로 내보낸다. 샘플링 필드와 `max_tokens`는 전달 전에 제거한다.
 
 ## 보안과 유지
 

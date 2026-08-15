@@ -9,6 +9,25 @@ export interface OpenAIToolCall {
   };
 }
 
+export interface OpenAIFunctionTool {
+  readonly type: "function";
+  readonly function: {
+    readonly name: string;
+    readonly description?: string;
+    readonly parameters?: Readonly<Record<string, unknown>>;
+    readonly strict?: boolean;
+  };
+}
+
+export type OpenAIToolChoice =
+  | "auto"
+  | "none"
+  | "required"
+  | {
+      readonly type: "function";
+      readonly function: { readonly name: string };
+    };
+
 export interface OpenAIChatMessage {
   readonly role: OpenAIRole;
   readonly content?: string | ReadonlyArray<Record<string, unknown>> | null;
@@ -24,8 +43,9 @@ export interface OpenAIChatCompletionRequest {
   readonly max_tokens?: number;
   readonly temperature?: number;
   readonly top_p?: number;
-  readonly tools?: readonly unknown[];
-  readonly tool_choice?: unknown;
+  readonly tools?: readonly OpenAIFunctionTool[];
+  readonly tool_choice?: OpenAIToolChoice;
+  readonly parallel_tool_calls?: boolean;
   readonly stream_options?: { readonly include_usage?: boolean };
 }
 

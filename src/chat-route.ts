@@ -4,19 +4,25 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
 import { createFetchUpstreamTransport, releaseAfterStream } from "./chat-transport.js";
-import {
-  EmptyVisibleResponseError,
-  NoAvailableCredentialError,
-  UnsupportedToolsError,
-  UpstreamError,
-} from "./errors.js";
+import { EmptyVisibleResponseError, NoAvailableCredentialError, UpstreamError } from "./errors.js";
 import { resolveModel } from "./config.js";
 import { finishFreebuffRun, startFreebuffRun, type FreebuffRun } from "./freebuff-run.js";
 import { agentIdForModel } from "./model-catalog.js";
 import type { BridgeRuntime } from "./runtime.js";
 import { primeVisibleSse } from "./sse.js";
+import { completionAsSse, normalizeToolCompletion, planToolBridge } from "./tool-bridge.js";
 import { forwardChat, type UpstreamTransport } from "./upstream.js";
 import type { BridgeConfig, CredentialState, OpenAIChatCompletionRequest } from "./types.js";
+
+const functionToolSchema = z.object({
+  type: z.literal("function"),
+  function: z.object({
+    name: z.string().min(1),
+    description: z.string().optional(),
+    parameters: z.record(z.string(), z.unknown()).optional(),
+    strict: z.boolean().optional(),
+  }),
+});
 
 const chatSchema = z.object({
   model: z.string().min(1),
@@ -48,8 +54,17 @@ const chatSchema = z.object({
   max_tokens: z.number().int().positive().optional(),
   temperature: z.number().min(0).max(2).optional(),
   top_p: z.number().min(0).max(1).optional(),
-  tools: z.array(z.unknown()).optional(),
-  tool_choice: z.unknown().optional(),
+  tools: z.array(functionToolSchema).optional(),
+  tool_choice: z
+    .union([
+      z.enum(["auto", "none", "required"]),
+      z.object({
+        type: z.literal("function"),
+        function: z.object({ name: z.string().min(1) }),
+      }),
+    ])
+    .optional(),
+  parallel_tool_calls: z.boolean().optional(),
   stream_options: z.object({ include_usage: z.boolean().optional() }).optional(),
 });
 
@@ -86,10 +101,8 @@ export function registerChatRoute(
 ): void {
   app.post("/v1/chat/completions", async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = chatSchema.parse(request.body) as OpenAIChatCompletionRequest;
-    if ((parsed.tools?.length ?? 0) > 0 && parsed.tool_choice !== "none") {
-      throw new UnsupportedToolsError();
-    }
     const model = resolveModel(options.config, parsed.model);
+    const toolPlan = planToolBridge({ ...parsed, model });
     const transport =
       options.upstream ??
       createFetchUpstreamTransport(options.config.timeoutMs, options.config.requestBodyLimitBytes);
@@ -123,10 +136,29 @@ export function registerChatRoute(
           apiBase: options.config.apiBase,
           token: state.account.authToken,
           instanceId: state.session.instanceId,
-          request: { ...parsed, model },
+          request: toolPlan.request,
           clientId: crypto.randomUUID(),
           run: { ...run, agentId },
         });
+        if (toolPlan.active) {
+          const normalized = normalizeToolCompletion(result.json, toolPlan);
+          if (parsed.stream) {
+            const visibleStream = completionAsSse(normalized, toolPlan.includeUsage);
+            releaseImmediately = false;
+            return sendStream(reply, visibleStream, () => {
+              options.runtime.release(state);
+              if (!options.upstream && run) {
+                void finishFreebuffRun({
+                  apiBase: options.config.apiBase,
+                  token: state.account.authToken,
+                  timeoutMs: options.config.timeoutMs,
+                  ...run,
+                });
+              }
+            });
+          }
+          return reply.code(result.status).send(normalized);
+        }
         if (parsed.stream) {
           const source = result.stream ?? Readable.from([result.text ?? ""]);
           const visibleStream = await primeVisibleSse(source, options.config.requestBodyLimitBytes);

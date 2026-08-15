@@ -84,22 +84,6 @@ describe("chat route", () => {
     await app.close();
   });
 
-  it("rejects active tool selection instead of silently ignoring it", async () => {
-    const app = await createApp({ config: testConfig() });
-    const response = await app.inject({
-      method: "POST",
-      url: "/v1/chat/completions",
-      payload: {
-        ...payload,
-        tools: [{ type: "function", function: { name: "Bash" } }],
-        tool_choice: "required",
-      },
-    });
-    expect(response.statusCode).toBe(400);
-    expect(response.json().error.code).toBe("freebuff_tools_unsupported");
-    await app.close();
-  });
-
   it("fails closed on an empty completion without tool calls", async () => {
     const config = testConfig();
     const app = await createApp({
