@@ -33,4 +33,14 @@ describe("dashboard credential editor", () => {
     expect(serverCard).toContain('id="bridgeApiKey"');
     expect(html).toMatch(/id="shortOptions"[^>]* hidden/);
   });
+
+  it("keeps a generated client key pending until JSON save succeeds", () => {
+    const html = dashboardHtml();
+
+    expect(html).toContain('pendingBridgeKey=""');
+    expect(html).toContain("const pendingKey=pendingBridgeKey");
+    expect(html).toMatch(
+      /\$\("saveKey"\)\.onclick=.*if\(pendingBridgeKey\).*pendingBridgeKey=key.*return.*adminAuthKey=key/,
+    );
+  });
 });

@@ -12,7 +12,7 @@ export function dashboardClientScript(initialConfig: unknown = null): string {
     const esc=(value)=>String(value??"").replace(/[&<>"']/g,(char)=>({"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;","'":"&#39;"}[char]));
     let activeLang=(localStorage.getItem("dashboardLang")||navigator.language||"ko").slice(0,2);
     if(!["ko","en","zh"].includes(activeLang)) activeLang="ko";
-    let cfg=initialConfig,dirty=false,adminAuthKey=localStorage.getItem("bridgeApiKey")||"";
+    let cfg=initialConfig,dirty=false,adminAuthKey=localStorage.getItem("bridgeApiKey")||"",pendingBridgeKey="";
     const tr=(key)=>translations[activeLang]?.[key]??translations.ko[key]??key;
     const policyPart=(policy,index)=>translations[activeLang]?.policies?.[policy]?.[index]??policy;
     function toast(message){const el=$("toast");el.textContent=message;el.classList.add("show");setTimeout(()=>el.classList.remove("show"),2200)}
@@ -76,11 +76,11 @@ export function dashboardClientScript(initialConfig: unknown = null): string {
     $("maxConcurrent").oninput=()=>{cfg.routing.maxConcurrent=Number($("maxConcurrent").value)||1;markDirty()};
     $("addCred").onclick=()=>{let number=1;while(cfg.credentials.some((item)=>item.id==="key"+number))number++;cfg.credentials.push({id:"key"+number,label:"key"+number,enabled:true,status:"none",remaining:null,isNew:true,authTokenConfigured:false});markDirty();renderCredentials()};
     $("refreshCreds").onclick=async()=>{try{const snapshot=await fetchJson("/admin/freebuff/credentials?refresh=true");cfg.credentials=snapshot.credentials;annotateCredentials();renderCredentials();toast(tr("refresh"))}catch(error){toast(tr("refreshFailed")+": "+error.message)}};
-    $("save").onclick=async()=>{try{const pendingKey=fullBridgeKey();cfg=await fetchJson("/admin/config",{method:"PUT",body:JSON.stringify({...(pendingKey?{bridgeApiKey:pendingKey}:{}),server:cfg.server,routing:{policy:cfg.routing.policy,maxConcurrent:Number(cfg.routing.maxConcurrent)||0},models:cfg.models.map(({id,enabled})=>({id,enabled})),credentials:credentialPayloads()})});if(pendingKey){adminAuthKey=pendingKey;localStorage.setItem("bridgeApiKey",pendingKey)}annotateCredentials();dirty=true;applyLang();toast(tr("saveJson"))}catch(error){toast(tr("saveFailed")+": "+error.message)}};
+    $("save").onclick=async()=>{try{const pendingKey=pendingBridgeKey;cfg=await fetchJson("/admin/config",{method:"PUT",body:JSON.stringify({...(pendingKey?{bridgeApiKey:pendingKey}:{}),server:cfg.server,routing:{policy:cfg.routing.policy,maxConcurrent:Number(cfg.routing.maxConcurrent)||0},models:cfg.models.map(({id,enabled})=>({id,enabled})),credentials:credentialPayloads()})});if(pendingKey){adminAuthKey=pendingKey;localStorage.setItem("bridgeApiKey",pendingKey);pendingBridgeKey=""}annotateCredentials();dirty=true;applyLang();toast(tr("saveJson"))}catch(error){toast(tr("saveFailed")+": "+error.message)}};
     $("restart").onclick=async()=>{try{await fetchJson("/admin/restart",{method:"POST",body:"{}"});await waitForRestart()}catch(error){toast(tr("restartFailed")+": "+error.message)}};
-    $("genKey").onclick=()=>{const bytes=crypto.getRandomValues(new Uint8Array(24));$("bridgeApiKey").value=Array.from(bytes,(byte)=>byte.toString(16).padStart(2,"0")).join("");markDirty()};
+    $("genKey").onclick=()=>{const bytes=crypto.getRandomValues(new Uint8Array(24));$("bridgeApiKey").value=Array.from(bytes,(byte)=>byte.toString(16).padStart(2,"0")).join("");pendingBridgeKey=fullBridgeKey();markDirty()};
     $("copyKey").onclick=async()=>{const key=fullBridgeKey();if(!key)return toast(tr("clientKeyEmpty"));await navigator.clipboard.writeText(key);toast(tr("copyClientApiKey"))};
-    $("saveKey").onclick=async()=>{const key=fullBridgeKey();if(!key)return toast(tr("clientKeyEmpty"));adminAuthKey=key;localStorage.setItem("bridgeApiKey",key);try{await load();toast(tr("online"))}catch(error){toast(error.message)}};
+    $("saveKey").onclick=async()=>{const key=fullBridgeKey();if(!key)return toast(tr("clientKeyEmpty"));if(pendingBridgeKey){pendingBridgeKey=key;markDirty();return toast(tr("saveClientApiKey"))}adminAuthKey=key;localStorage.setItem("bridgeApiKey",key);try{await load();toast(tr("online"))}catch(error){toast(error.message)}};
     function setModels(predicate,enabled){cfg.models.forEach((model)=>{if(predicate(model))model.enabled=enabled});markDirty();renderModels()}
     $("enableAllModels").onclick=()=>setModels(()=>true,true);$("disableAllModels").onclick=()=>setModels(()=>true,false);
     $("enablePremium").onclick=()=>setModels((model)=>model.premium,true);$("disablePremium").onclick=()=>setModels((model)=>model.premium,false);
