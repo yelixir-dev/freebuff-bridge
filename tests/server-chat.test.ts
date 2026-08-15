@@ -69,8 +69,14 @@ describe("chat route", () => {
     expect(response.statusCode).toBe(200);
     expect(methods).toContain("POST");
     expect(forwarded).toMatchObject({
-      messages,
-      codebuff: { codebuff_metadata: { cost_mode: "free" } },
+      messages: [
+        {
+          role: "system",
+          content: expect.stringMatching(/^You are Buffy, the strategic coding assistant\./),
+        },
+        ...messages,
+      ],
+      codebuff_metadata: { cost_mode: "free" },
     });
     expect(forwarded).not.toHaveProperty("temperature");
     expect(forwarded).not.toHaveProperty("tools");

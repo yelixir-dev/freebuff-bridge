@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import type { Readable } from "node:stream";
 
 import {
@@ -6,7 +5,7 @@ import {
   InvalidUpstreamResponseError,
   UpstreamError,
 } from "./errors.js";
-import { chatMetadata, officialChatHeaders, stripSampling } from "./identity.js";
+import { chatMetadata, ensureFreeMarker, officialChatHeaders, stripSampling } from "./identity.js";
 import type { OpenAIChatCompletionRequest } from "./types.js";
 
 export interface UpstreamTransport {
@@ -69,6 +68,11 @@ export async function forwardChat(input: {
   readonly instanceId: string;
   readonly request: OpenAIChatCompletionRequest;
   readonly clientId: string;
+  readonly run: {
+    readonly runId: string;
+    readonly actingUserId?: string;
+    readonly agentId: string;
+  };
 }): Promise<{
   readonly status: number;
   readonly json?: unknown;
@@ -78,16 +82,22 @@ export async function forwardChat(input: {
   const cleaned = stripSampling({ ...input.request });
   const body = {
     ...cleaned,
+    messages: ensureFreeMarker(input.request.messages),
     stream: input.request.stream === true,
-    ...chatMetadata({ runId: randomUUID(), clientId: input.clientId }),
+    ...chatMetadata({
+      runId: input.run.runId,
+      clientId: input.clientId,
+      agentId: input.run.agentId,
+      instanceId: input.instanceId,
+    }),
   };
   const response = await input.transport.chat({
     url: `${input.apiBase.replace(/\/$/, "")}/api/v1/chat/completions`,
     headers: {
       ...officialChatHeaders({
         token: input.token,
-        instanceId: input.instanceId,
         model: input.request.model,
+        ...(input.run.actingUserId ? { actingUserId: input.run.actingUserId } : {}),
       }),
       "content-type": "application/json",
     },

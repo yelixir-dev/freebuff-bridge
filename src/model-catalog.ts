@@ -61,6 +61,16 @@ export function findModel(id: string): ModelOption | undefined {
   return MODEL_CATALOG.find((model) => model.id === id);
 }
 
+export function agentIdForModel(id: string): string {
+  const ids: Readonly<Record<string, string>> = {
+    "deepseek/deepseek-v4-flash": "base2-free-deepseek-flash",
+    "deepseek/deepseek-v4-pro": "base2-free-deepseek",
+    "xiaomi/mimo-v2.5": "base2-free-mimo",
+    "minimax/minimax-m3": "base2-free-minimax-m3",
+  };
+  return ids[id] ?? "base2-free";
+}
+
 export function enabledModels(models: readonly ModelOption[]): readonly ModelOption[] {
   return models.filter((model) => model.enabled);
 }

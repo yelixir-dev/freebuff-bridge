@@ -11,6 +11,8 @@ import {
   UpstreamError,
 } from "./errors.js";
 import { resolveModel } from "./config.js";
+import { finishFreebuffRun, startFreebuffRun, type FreebuffRun } from "./freebuff-run.js";
+import { agentIdForModel } from "./model-catalog.js";
 import type { BridgeRuntime } from "./runtime.js";
 import { primeVisibleSse } from "./sse.js";
 import { forwardChat, type UpstreamTransport } from "./upstream.js";
@@ -102,23 +104,44 @@ export function registerChatRoute(
         throw lastError ?? error;
       }
       let releaseImmediately = true;
+      let run: FreebuffRun | undefined;
       try {
         if (!state.session?.instanceId) {
           throw new NoAvailableCredentialError("session missing instance");
         }
+        const agentId = agentIdForModel(model);
+        run = options.upstream
+          ? { runId: crypto.randomUUID() }
+          : await startFreebuffRun({
+              apiBase: options.config.apiBase,
+              token: state.account.authToken,
+              agentId,
+              timeoutMs: options.config.timeoutMs,
+            });
         const result = await forwardChat({
           transport,
           apiBase: options.config.apiBase,
           token: state.account.authToken,
           instanceId: state.session.instanceId,
           request: { ...parsed, model },
-          clientId: state.account.fingerprintId || state.account.id,
+          clientId: crypto.randomUUID(),
+          run: { ...run, agentId },
         });
         if (parsed.stream) {
           const source = result.stream ?? Readable.from([result.text ?? ""]);
           const visibleStream = await primeVisibleSse(source, options.config.requestBodyLimitBytes);
           releaseImmediately = false;
-          return sendStream(reply, visibleStream, () => options.runtime.release(state));
+          return sendStream(reply, visibleStream, () => {
+            options.runtime.release(state);
+            if (!options.upstream && run) {
+              void finishFreebuffRun({
+                apiBase: options.config.apiBase,
+                token: state.account.authToken,
+                timeoutMs: options.config.timeoutMs,
+                ...run,
+              });
+            }
+          });
         }
         return reply.code(result.status).send(result.json);
       } catch (error) {
@@ -130,7 +153,17 @@ export function registerChatRoute(
         }
         if (!retryable || excluded.size >= options.runtime.states.length) throw error;
       } finally {
-        if (releaseImmediately) options.runtime.release(state);
+        if (releaseImmediately) {
+          options.runtime.release(state);
+          if (!options.upstream && run) {
+            await finishFreebuffRun({
+              apiBase: options.config.apiBase,
+              token: state.account.authToken,
+              timeoutMs: options.config.timeoutMs,
+              ...run,
+            });
+          }
+        }
       }
     }
     throw lastError ?? new NoAvailableCredentialError();
