@@ -22,7 +22,7 @@ export const MODEL_CATALOG: readonly ModelOption[] = [
     notes: "Limited-tier default; unlimited on full CLI",
   },
   {
-    id: "xiaomi/mimo-v2.5",
+    id: "mimo/mimo-v2.5",
     label: "MiMo 2.5",
     provider: "Xiaomi",
     premium: false,
@@ -65,7 +65,7 @@ export function agentIdForModel(id: string): string {
   const ids: Readonly<Record<string, string>> = {
     "deepseek/deepseek-v4-flash": "base2-free-deepseek-flash",
     "deepseek/deepseek-v4-pro": "base2-free-deepseek",
-    "xiaomi/mimo-v2.5": "base2-free-mimo",
+    "mimo/mimo-v2.5": "base2-free-mimo",
     "minimax/minimax-m3": "base2-free-minimax-m3",
   };
   return ids[id] ?? "base2-free";
