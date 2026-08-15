@@ -8,17 +8,17 @@ import { assertBridgeAuth } from "./auth.js";
 import { registerChatRoute } from "./chat-route.js";
 import { loadBridgeConfig } from "./config.js";
 import { writeDashboardConfigFile } from "./dashboard-config.js";
+import { adminView, publicDashboardView } from "./dashboard-view.js";
 import { dashboardHtml } from "./dashboard.js";
 import { AuthError, BridgeError } from "./errors.js";
 import { isLoopbackBootstrapRequest, shouldRequireAuth } from "./http-guards.js";
 import { publicModelObject } from "./model-catalog.js";
 import { openaiError } from "./openai.js";
-import { redactedPreview } from "./router.js";
-import { fetchSessionTransport, BridgeRuntime } from "./runtime.js";
+import { BridgeRuntime, fetchSessionTransport } from "./runtime.js";
 import { FreebuffSessionClient } from "./session.js";
+import type { BridgeConfig, FreebuffAccount } from "./types.js";
 import type { UpstreamTransport } from "./upstream.js";
 import { BRIDGE_VERSION } from "./version.js";
-import type { BridgeConfig, FreebuffAccount } from "./types.js";
 
 export interface CreateAppOptions {
   readonly config?: BridgeConfig;
@@ -84,37 +84,6 @@ function sendError(reply: FastifyReply, error: unknown): FastifyReply {
   return reply.code(statusCode).send(openaiError(statusCode, message, "server_error").body);
 }
 
-function adminView(runtime: BridgeRuntime, config: BridgeConfig, dirty: boolean) {
-  const diagnostics = new Map(runtime.diagnostics().map((item) => [item.id, item]));
-  const credentials = config.dashboardCredentials ?? runtime.states.map((state) => state.account);
-  return {
-    version: BRIDGE_VERSION,
-    dirty,
-    restart_required: dirty,
-    server: { host: config.host, port: config.port },
-    routing: {
-      policy: config.routingPolicy,
-      maxConcurrent: config.maxConcurrent,
-      accountCount: credentials.length,
-    },
-    bridgeApiKey: config.bridgeApiKey ? "sk-[REDACTED]" : "",
-    models: config.models,
-    credentials: credentials.map((account) => ({
-      ...(diagnostics.get(account.id) ?? {
-        status: "none",
-        remaining: null,
-        quota: null,
-        disabledUntil: null,
-      }),
-      id: account.id,
-      label: account.label,
-      enabled: account.enabled,
-      authTokenConfigured: Boolean(account.authToken),
-      authTokenPreview: redactedPreview(account.authToken),
-    })),
-  };
-}
-
 export async function createApp(options: CreateAppOptions = {}): Promise<FastifyInstance> {
   const config = options.config ?? loadBridgeConfig();
   let dashboardConfig = config;
@@ -158,7 +127,10 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Fastify
     credentials: runtime.states.length,
     defaultModel: config.defaultModel,
   }));
-  app.get("/dashboard", async (_request, reply) => reply.type("text/html").send(dashboardHtml()));
+  app.get("/dashboard", async (_request, reply) => {
+    const initialView = publicDashboardView(runtime, dashboardConfig, configDirty);
+    return reply.type("text/html").send(dashboardHtml(initialView));
+  });
   app.get("/v1/models", async () => ({
     object: "list",
     data: config.models.filter((model) => model.enabled).map(publicModelObject),

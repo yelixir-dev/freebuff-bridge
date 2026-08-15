@@ -4,14 +4,15 @@ function scriptJson(value: unknown): string {
   return JSON.stringify(value).replace(/</g, "\\u003c");
 }
 
-export function dashboardClientScript(): string {
+export function dashboardClientScript(initialConfig: unknown = null): string {
   return `
     const translations=${scriptJson(translations)};
+    const initialConfig=${scriptJson(initialConfig)};
     const $=(id)=>document.getElementById(id);
     const esc=(value)=>String(value??"").replace(/[&<>"']/g,(char)=>({"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;","'":"&#39;"}[char]));
     let activeLang=(localStorage.getItem("dashboardLang")||navigator.language||"ko").slice(0,2);
     if(!["ko","en","zh"].includes(activeLang)) activeLang="ko";
-    let cfg=null,dirty=false,adminAuthKey=localStorage.getItem("bridgeApiKey")||"";
+    let cfg=initialConfig,dirty=false,adminAuthKey=localStorage.getItem("bridgeApiKey")||"";
     const tr=(key)=>translations[activeLang]?.[key]??translations.ko[key]??key;
     const policyPart=(policy,index)=>translations[activeLang]?.policies?.[policy]?.[index]??policy;
     function toast(message){const el=$("toast");el.textContent=message;el.classList.add("show");setTimeout(()=>el.classList.remove("show"),2200)}
@@ -58,10 +59,9 @@ export function dashboardClientScript(): string {
       if(cfg)render();markDirty(dirty);
     }
     async function load(){
-      await fetchJson("/health");cfg=await fetchJson("/admin/config");annotateCredentials();
-      dirty=Boolean(cfg.dirty);applyLang();
+      try{await fetchJson("/health");$("dot").className="dot on";$("online").dataset.state="online";$("online").textContent=tr("online")}catch{$("dot").className="dot off";$("online").dataset.state="offline";$("online").textContent=tr("offline")}
+      try{cfg=await fetchJson("/admin/config");annotateCredentials();dirty=Boolean(cfg.dirty);applyLang()}catch(error){if(!cfg)toast(error.message);return}
       try{const snapshot=await fetchJson("/admin/freebuff/credentials?refresh=true");cfg.credentials=snapshot.credentials;annotateCredentials();renderCredentials()}catch(error){toast(tr("refreshFailed")+": "+error.message)}
-      $("dot").className="dot on";$("online").dataset.state="online";$("online").textContent=tr("online");
     }
     async function waitForRestart(){
       const target=new URL(location.href);target.port=String(cfg.server.port);target.pathname="/dashboard";
@@ -88,6 +88,6 @@ export function dashboardClientScript(): string {
     $("credHelp").onclick=(event)=>{event.stopPropagation();setCredHelp(!$("credHelp").classList.contains("open"))};
     document.addEventListener("click",(event)=>{if(!$("credHelp").contains(event.target))setCredHelp(false)});
     document.addEventListener("keydown",(event)=>{if(event.key==="Escape"&&$("credHelp").classList.contains("open")){setCredHelp(false);$("credHelp").focus()}});
-    applyLang();load().catch(()=>{$("dot").className="dot off";$("online").dataset.state="offline";$("online").textContent=tr("offline")});
+    applyLang();load();
   `;
 }

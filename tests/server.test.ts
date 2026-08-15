@@ -27,7 +27,8 @@ describe("createApp admin surfaces", () => {
     expect(dashboard.body).toContain("heading-info");
     expect(dashboard.body).toContain("thin_long");
     expect(dashboard.body).not.toContain(testAccount.authToken);
-    expect(dashboard.body).not.toContain(testAccount.label);
+    expect(dashboard.body).toContain(testAccount.label);
+    expect(dashboard.body).not.toContain('"authTokenPreview":"••••"');
     const script = /<script>([\s\S]*)<\/script>/.exec(dashboard.body)?.[1];
     expect(script).toBeTruthy();
     expect(() => new Function(script ?? "")).not.toThrow();

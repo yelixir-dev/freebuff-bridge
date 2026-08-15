@@ -2,7 +2,7 @@ import { dashboardClientScript } from "./dashboard-client.js";
 import { DASHBOARD_CSS } from "./dashboard-css.js";
 import { BRIDGE_VERSION } from "./version.js";
 
-export function dashboardHtml(): string {
+export function dashboardHtml(initialConfig: unknown = null): string {
   return `<!doctype html>
 <html lang="ko">
 <head>
@@ -52,22 +52,21 @@ export function dashboardHtml(): string {
             </select>
           </label>
           <label class="field"><span data-i18n="port">포트</span><input id="bindPort" type="number" min="1" max="65535" /></label>
+         </div>
+        <div class="field bridge-key">
+          <span data-i18n="clientApiKey">클라이언트 API 키</span>
+          <div class="bridge-key-row">
+            <span class="bridge-key-prefix">sk-</span>
+            <input id="bridgeApiKey" type="password" autocomplete="off" data-i18n-placeholder="bridgeKeyPlaceholder" />
+          </div>
+          <div class="bridge-key-help-row">
+            <span class="bridge-key-help" data-i18n="bridgeKeyHelp"></span>
+            <button id="genKey" class="secondary" type="button" data-i18n-aria="generateClientApiKey" aria-label="클라이언트 API 키 생성">🎲</button>
+            <button id="copyKey" class="secondary" type="button" data-i18n-aria="copyClientApiKey" aria-label="클라이언트 API 키 복사">📋</button>
+            <button id="saveKey" class="secondary" type="button" data-i18n-aria="saveClientApiKey" aria-label="클라이언트 API 키 저장">💾</button>
+          </div>
         </div>
         <p class="small" data-i18n="afterRestart">재시작 후 적용됩니다.</p>
-      </section>
-
-      <section class="card">
-        <h2 data-i18n="clientApiKey">클라이언트 API 키</h2>
-        <div class="bridge-key-row">
-          <span class="bridge-key-prefix">sk-</span>
-          <input id="bridgeApiKey" type="password" autocomplete="off" data-i18n-placeholder="bridgeKeyPlaceholder" />
-        </div>
-        <div class="bridge-key-help-row">
-          <span class="bridge-key-help" data-i18n="bridgeKeyHelp"></span>
-          <button id="genKey" class="secondary" type="button" data-i18n-aria="generateClientApiKey" aria-label="클라이언트 API 키 생성">🎲</button>
-          <button id="copyKey" class="secondary" type="button" data-i18n-aria="copyClientApiKey" aria-label="클라이언트 API 키 복사">📋</button>
-          <button id="saveKey" class="secondary" type="button" data-i18n-aria="saveClientApiKey" aria-label="클라이언트 API 키 저장">💾</button>
-        </div>
       </section>
 
       <section class="card">
@@ -77,7 +76,7 @@ export function dashboardHtml(): string {
           <label class="policy"><input type="radio" name="routingPolicy" value="short_thick" /><span data-i18n="short_thick">짧고 굵게</span></label>
         </div>
         <p id="routingGuidance" class="routing-guidance"></p>
-        <label id="shortOptions" class="one-line-field field"><span data-i18n="maxConcurrent">최대 동시 호출</span><input id="maxConcurrent" type="number" min="1" /></label>
+        <label id="shortOptions" class="one-line-field field" hidden><span data-i18n="maxConcurrent">최대 동시 호출</span><input id="maxConcurrent" type="number" min="1" /></label>
       </section>
 
       <section class="card wide">
@@ -109,7 +108,7 @@ export function dashboardHtml(): string {
     </section>
   </main>
   <div id="toast" class="toast"></div>
-  <script>${dashboardClientScript()}</script>
+  <script>${dashboardClientScript(initialConfig)}</script>
 </body>
 </html>`;
 }

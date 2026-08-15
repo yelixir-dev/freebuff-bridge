@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { dashboardHtml } from "../src/dashboard.js";
+
 describe("dashboard credential editor", () => {
   it("renders CommandCode-style draft cards instead of an immediate token form", () => {
     const html = dashboardHtml();
@@ -23,5 +24,13 @@ describe("dashboard credential editor", () => {
     expect(html).toContain("cfg.credentials.push(");
     expect(html).toContain('class="provider-fold"');
     expect(html).toContain("data-provider");
+  });
+
+  it("keeps the client key inside the server editor and hides inactive short options", () => {
+    const html = dashboardHtml();
+    const serverCard = /<section class="card">([\s\S]*?)<\/section>/.exec(html)?.[1];
+
+    expect(serverCard).toContain('id="bridgeApiKey"');
+    expect(html).toMatch(/id="shortOptions"[^>]* hidden/);
   });
 });
