@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { loadBridgeConfig } from "../src/config.js";
 import { BridgeRuntime } from "../src/runtime.js";
 import { FreebuffSessionClient } from "../src/session.js";
@@ -19,6 +21,7 @@ export function testConfig(
     HOST: "127.0.0.1",
     PORT: "0",
     FREEBUFF_AUTH_TOKENS: "",
+    FREEBUFF_CONFIG_PATH: `/tmp/missing-freebuff-config-${randomUUID()}.json`,
     FREEBUFF_CREDENTIALS_PATH: "/tmp/missing-freebuff-creds.json",
     ...overrides,
   });

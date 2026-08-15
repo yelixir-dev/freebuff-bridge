@@ -4,13 +4,37 @@ import "dotenv/config";
 import { loadBridgeConfig } from "./config.js";
 import { createApp } from "./server.js";
 
-const config = loadBridgeConfig();
-const app = await createApp({ config });
+let wakeService: () => void = () => {};
+let shuttingDown = false;
 
-try {
-  await app.listen({ host: config.host, port: config.port });
-  app.log.info({ host: config.host, port: config.port }, "Freebuff Bridge listening");
-} catch (error) {
-  app.log.error(error, "Failed to start Freebuff Bridge");
-  process.exit(1);
+function requestShutdown(): void {
+  shuttingDown = true;
+  wakeService();
+}
+
+process.once("SIGINT", requestShutdown);
+process.once("SIGTERM", requestShutdown);
+
+while (!shuttingDown) {
+  const recycleRequested = new Promise<void>((resolve) => {
+    wakeService = resolve;
+  });
+  const config = loadBridgeConfig();
+  const app = await createApp({
+    config,
+    restart: async () => {
+      wakeService();
+    },
+  });
+
+  try {
+    await app.listen({ host: config.host, port: config.port });
+    app.log.info({ host: config.host, port: config.port }, "Freebuff Bridge listening");
+    await recycleRequested;
+    await app.close();
+  } catch (error) {
+    app.log.error(error, "Failed to run Freebuff Bridge");
+    process.exitCode = 1;
+    shuttingDown = true;
+  }
 }

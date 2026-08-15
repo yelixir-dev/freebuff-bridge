@@ -156,4 +156,40 @@ describe("BridgeRuntime admission recovery", () => {
       upstreamStatus: 500,
     });
   });
+
+  it("keeps healthy credential diagnostics when one refresh fails", async () => {
+    const runtime = runtimeWith(async (_method, token) => {
+      if (token === "bad") throw new Error("invalid credential");
+      return {
+        status: "active",
+        instanceId: "inst-good",
+        model: "deepseek/deepseek-v4-flash",
+      };
+    });
+    runtime.states.splice(
+      0,
+      runtime.states.length,
+      {
+        account: account("bad"),
+        disabledUntil: 0,
+        inFlight: 0,
+        lastSelectedAt: 0,
+        session: undefined,
+      },
+      {
+        account: account("good"),
+        disabledUntil: 0,
+        inFlight: 0,
+        lastSelectedAt: 0,
+        session: undefined,
+      },
+    );
+
+    await runtime.refreshAll();
+
+    expect(runtime.diagnostics()).toMatchObject([
+      { id: "bad", status: "none", message: "invalid credential" },
+      { id: "good", status: "active" },
+    ]);
+  });
 });

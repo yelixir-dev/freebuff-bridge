@@ -85,6 +85,7 @@ FREEBUFF_AUTH_TOKENS=account-token-1,account-token-2
 
 ```dotenv
 FREEBUFF_CREDENTIALS_PATH=/opt/freebuff-bridge/accounts.json
+FREEBUFF_CONFIG_PATH=/opt/freebuff-bridge/config.json
 ```
 
 ```json
@@ -113,7 +114,9 @@ chmod 600 /opt/freebuff-bridge/accounts.json
 
 **Dashboard**
 
-Open `http://127.0.0.1:9993/dashboard`, paste an upstream `authToken` under **Credentials**, and choose **Add key**. Dashboard-added tokens live only in process memory.
+Open `http://127.0.0.1:9993/dashboard`, choose **Add key**, then edit the credential name and `authToken` in the new card. **Save JSON** atomically writes the bridge configuration to `FREEBUFF_CONFIG_PATH` with mode `0600`; **Restart bridge** recycles the listener and runtime in the same service process so the saved credentials are reloaded.
+
+`FREEBUFF_CREDENTIALS_PATH` remains an optional import source. Before the first dashboard save it defaults to the current Freebuff CLI login file. After a dashboard configuration with a `credentials` list exists, that saved list is authoritative.
 
 For a remote Linux host, copy token values only. Do not copy desktop fingerprint fields, and do not use the same account simultaneously from the desktop CLI and the bridge.
 
@@ -170,7 +173,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now freebuff-bridge
 ```
 
-`POST /admin/restart` does not restart the Node process. Use systemd for real restarts.
+`POST /admin/restart` performs an in-process service recycle: the listener closes, configuration and credentials are reloaded from JSON, and a new listener starts. Use `systemctl restart freebuff-bridge` only when a new OS process is required.
 
 ## Usage
 
@@ -221,7 +224,7 @@ This is not the complete OpenAI API. The bridge preserves prior assistant `tool_
 - CORS is disabled unless `CORS_ORIGIN` is configured.
 - `/health` and the static dashboard HTML are public.
 - Remote `/v1/*` and `/admin/*` fail closed when no bridge key is configured. A keyless loopback process may bootstrap the dashboard; once a key exists, admin calls require it even through a local reverse proxy.
-- Dashboard settings, model toggles, and dashboard-added credentials are in-memory.
+- Dashboard settings, model toggles, and editable credential cards persist in `FREEBUFF_CONFIG_PATH`.
 - Persist host, port, bridge key, routing, and credentials in `.env` or a credentials file.
 - The server has no built-in HTTPS.
 

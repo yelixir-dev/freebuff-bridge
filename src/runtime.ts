@@ -14,7 +14,7 @@ import type { FreebuffSessionClient, SessionTransport } from "./session.js";
 import type { BridgeConfig, CredentialState, FreebuffAccount } from "./types.js";
 
 export function loadAccounts(config: BridgeConfig): FreebuffAccount[] {
-  const fromFile = loadCredentialsFile(config.credentialsPath);
+  const fromFile = config.dashboardCredentials ?? loadCredentialsFile(config.credentialsPath);
   const extras = accountsFromTokens(config.extraTokens);
   const seen = new Set(fromFile.map((account) => account.authToken));
   return [...fromFile, ...extras.filter((account) => !seen.has(account.authToken))];
@@ -69,6 +69,7 @@ export class BridgeRuntime {
         tokenPreview: redactedPreview(state.account.authToken),
         status: state.session?.status ?? "none",
         accessTier: state.session?.accessTier,
+        message: state.session?.message,
         quota,
         remaining: remainingSessions(quota),
         disabledUntil: state.disabledUntil || null,
@@ -79,14 +80,23 @@ export class BridgeRuntime {
   public async refreshAll(): Promise<void> {
     await Promise.all(
       this.states.map(async (state) => {
-        const instanceId = state.session?.instanceId;
-        state.session = await this.sessions.call("GET", state.account.authToken, {
-          ...(instanceId ? { instanceId } : {}),
-          compact: false,
-        });
-        state.disabledUntil = isQuotaExhausted(state.session, this.config.defaultModel)
-          ? cooldownUntil(state.session, Date.now(), this.config.cooldownMs)
-          : 0;
+        try {
+          const instanceId = state.session?.instanceId;
+          state.session = await this.sessions.call("GET", state.account.authToken, {
+            ...(instanceId ? { instanceId } : {}),
+            compact: false,
+          });
+          state.disabledUntil = isQuotaExhausted(state.session, this.config.defaultModel)
+            ? cooldownUntil(state.session, Date.now(), this.config.cooldownMs)
+            : 0;
+        } catch (error) {
+          // no-excuse-ok: catch — one invalid credential must not hide every dashboard card
+          state.session = {
+            status: "none",
+            message: error instanceof Error ? error.message : String(error),
+          };
+          state.disabledUntil = Date.now() + this.config.cooldownMs;
+        }
       }),
     );
   }

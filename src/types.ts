@@ -101,6 +101,8 @@ export interface BridgeConfig {
   readonly rateLimitWindow: string;
   readonly logLevel: string;
   readonly corsOrigin: string;
+  readonly dashboardConfigPath: string;
+  readonly dashboardCredentials: readonly FreebuffAccount[] | undefined;
   readonly credentialsPath: string;
   readonly extraTokens: readonly string[];
   readonly models: readonly ModelOption[];

@@ -1,6 +1,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+import { defaultDashboardConfigPath, readDashboardConfigFile } from "./dashboard-config.js";
 import { ConfigError, ModelNotAllowedError } from "./errors.js";
 import { DEFAULT_MODEL_ID, MODEL_CATALOG, findModel } from "./model-catalog.js";
 import { ROUTING_POLICIES, type BridgeConfig, type RoutingPolicy } from "./types.js";
@@ -28,15 +29,19 @@ export function defaultCredentialsPath(): string {
 
 export function loadBridgeConfig(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
   const extra = envString(env, "FREEBUFF_AUTH_TOKENS", "");
+  const dashboardConfigPath = envString(env, "FREEBUFF_CONFIG_PATH", defaultDashboardConfigPath());
+  const saved = readDashboardConfigFile(dashboardConfigPath);
+  const savedModels = new Map(saved?.models?.map((model) => [model.id, model.enabled]));
   return {
-    host: envString(env, "HOST", "127.0.0.1"),
-    port: envNumber(env, "PORT", 9993),
-    bridgeApiKey: envString(env, "BRIDGE_API_KEY", ""),
+    host: saved?.server?.host ?? envString(env, "HOST", "127.0.0.1"),
+    port: saved?.server?.port ?? envNumber(env, "PORT", 9993),
+    bridgeApiKey: saved?.bridgeApiKey ?? envString(env, "BRIDGE_API_KEY", ""),
     apiBase: envString(env, "FREEBUFF_API_BASE", "https://www.codebuff.com"),
     cliVersion: envString(env, "FREEBUFF_CLI_VERSION", "0.0.149"),
     defaultModel: envString(env, "FREEBUFF_DEFAULT_MODEL", DEFAULT_MODEL_ID),
-    routingPolicy: parsePolicy(envString(env, "FREEBUFF_ROUTING_POLICY", "thin_long")),
-    maxConcurrent: envNumber(env, "FREEBUFF_MAX_CONCURRENT", 0),
+    routingPolicy:
+      saved?.routing?.policy ?? parsePolicy(envString(env, "FREEBUFF_ROUTING_POLICY", "thin_long")),
+    maxConcurrent: saved?.routing?.maxConcurrent ?? envNumber(env, "FREEBUFF_MAX_CONCURRENT", 0),
     cooldownMs: envNumber(env, "FREEBUFF_CREDENTIAL_COOLDOWN_MS", 60_000),
     timeoutMs: envNumber(env, "FREEBUFF_TIMEOUT_MS", 600_000),
     requestBodyLimitBytes: envNumber(env, "REQUEST_BODY_LIMIT_BYTES", 1_048_576),
@@ -44,6 +49,8 @@ export function loadBridgeConfig(env: NodeJS.ProcessEnv = process.env): BridgeCo
     rateLimitWindow: envString(env, "RATE_LIMIT_WINDOW", "1 minute"),
     logLevel: envString(env, "LOG_LEVEL", "info"),
     corsOrigin: envString(env, "CORS_ORIGIN", ""),
+    dashboardConfigPath,
+    dashboardCredentials: saved?.credentials,
     credentialsPath: envString(env, "FREEBUFF_CREDENTIALS_PATH", defaultCredentialsPath()),
     extraTokens: extra
       ? extra
@@ -51,7 +58,10 @@ export function loadBridgeConfig(env: NodeJS.ProcessEnv = process.env): BridgeCo
           .map((token) => token.trim())
           .filter(Boolean)
       : [],
-    models: MODEL_CATALOG,
+    models: MODEL_CATALOG.map((model) => ({
+      ...model,
+      enabled: savedModels.get(model.id) ?? model.enabled,
+    })),
   };
 }
 

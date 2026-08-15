@@ -85,6 +85,7 @@ FREEBUFF_AUTH_TOKENS=account-token-1,account-token-2
 
 ```dotenv
 FREEBUFF_CREDENTIALS_PATH=/opt/freebuff-bridge/accounts.json
+FREEBUFF_CONFIG_PATH=/opt/freebuff-bridge/config.json
 ```
 
 ```json
@@ -113,7 +114,9 @@ chmod 600 /opt/freebuff-bridge/accounts.json
 
 **대시보드**
 
-`http://127.0.0.1:9993/dashboard`를 열고 **자격 증명** 아래에 업스트림 `authToken`을 붙여넣은 뒤 **키 추가**를 누른다. 대시보드로 넣은 토큰은 프로세스 메모리에만 있다.
+`http://127.0.0.1:9993/dashboard`를 열고 **키 추가**를 누른 뒤 새 카드에서 자격증명 이름과 `authToken`을 입력한다. **JSON 저장**은 브릿지 설정을 `FREEBUFF_CONFIG_PATH`에 `0600` 권한으로 원자적으로 기록한다. **브릿지 재시작**은 같은 서비스 프로세스 안에서 listener와 runtime을 재생성해 저장된 자격증명을 다시 불러온다.
+
+`FREEBUFF_CREDENTIALS_PATH`는 선택적인 가져오기 원본이다. 첫 대시보드 저장 전에는 현재 Freebuff CLI 로그인 파일을 기본으로 읽는다. `credentials` 목록이 있는 대시보드 설정 파일이 생긴 뒤에는 저장된 목록을 기준으로 사용한다.
 
 원격 Linux 호스트에는 토큰 값만 복사한다. 데스크톱 핑거프린트 필드는 복사하지 말고, 브릿지가 사용하는 계정을 데스크톱 CLI에서 동시에 사용하지 않는다.
 
@@ -170,7 +173,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now freebuff-bridge
 ```
 
-`POST /admin/restart`는 Node 프로세스를 재시작하지 않는다. 실제 재시작은 systemd로 한다.
+`POST /admin/restart`는 listener를 닫고 JSON 설정과 자격증명을 다시 읽은 뒤 새 listener를 여는 서비스 재생성을 수행한다. 새 OS 프로세스가 필요할 때만 `systemctl restart freebuff-bridge`를 사용한다.
 
 ## 사용법
 
@@ -221,7 +224,7 @@ http://호스트또는IP:9993/v1
 - `CORS_ORIGIN`을 지정하지 않으면 CORS는 꺼져 있다.
 - `/health`와 정적 대시보드 HTML은 공개다.
 - 원격 `/v1/*`, `/admin/*`는 브릿지 키가 없으면 닫힌다. 키가 없는 loopback 프로세스만 대시보드를 bootstrap할 수 있고, 키가 생긴 뒤에는 로컬 reverse proxy를 거쳐도 admin 호출에 키가 필요하다.
-- 대시보드 설정, 모델 토글, 대시보드에서 추가한 자격증명은 메모리에만 있다.
+- 대시보드 설정, 모델 토글, 편집 가능한 자격증명 카드는 `FREEBUFF_CONFIG_PATH`에 저장된다.
 - 호스트, 포트, 브릿지 키, 라우팅, 자격증명은 `.env` 또는 자격증명 파일로 유지한다.
 - 내장 HTTPS는 없다.
 
