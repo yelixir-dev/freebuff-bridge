@@ -2,10 +2,6 @@ import type { FastifyRequest } from "fastify";
 
 export function shouldRequireAuth(request: FastifyRequest): boolean {
   if (request.method === "OPTIONS") return false;
-  if (request.method === "GET" && request.url.startsWith("/admin/config")) return false;
-  if (request.method === "GET" && request.url.startsWith("/admin/freebuff/credentials")) {
-    return false;
-  }
   return request.url.startsWith("/v1/") || request.url.startsWith("/admin/");
 }
 

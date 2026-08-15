@@ -1,4 +1,3 @@
-import { assertNever } from "./assert-never.js";
 import type { SessionRateLimit, SessionSnapshot, SessionStatus } from "./types.js";
 
 export function remainingSessions(limit: SessionRateLimit | undefined): number | undefined {
@@ -16,7 +15,8 @@ export function quotaForModel(
   if (snapshot.rateLimit?.model === model) return snapshot.rateLimit;
   if (snapshot.rateLimit) return snapshot.rateLimit;
   if (!byModel) return undefined;
-  return Object.values(byModel)[0];
+  const limits = Object.values(byModel);
+  return limits.length === 1 ? limits[0] : undefined;
 }
 
 export function isQuotaExhausted(snapshot: SessionSnapshot | undefined, model: string): boolean {
@@ -26,7 +26,7 @@ export function isQuotaExhausted(snapshot: SessionSnapshot | undefined, model: s
   return remaining !== undefined && remaining <= 0;
 }
 
-export function cooldownUntil(snapshot: SessionSnapshot, now: number): number {
+export function cooldownUntil(snapshot: SessionSnapshot, now: number, fallbackMs = 60_000): number {
   if (snapshot.retryAfterMs !== undefined) return now + snapshot.retryAfterMs;
   const resetAt =
     snapshot.rateLimit?.resetAt ?? quotaForModel(snapshot, snapshot.model ?? "")?.resetAt;
@@ -34,7 +34,7 @@ export function cooldownUntil(snapshot: SessionSnapshot, now: number): number {
     const parsed = Date.parse(resetAt);
     if (Number.isFinite(parsed) && parsed > now) return parsed;
   }
-  return now + 60_000;
+  return now + fallbackMs;
 }
 
 export function classifySessionStatus(status: string): SessionStatus {
@@ -55,24 +55,5 @@ export function classifySessionStatus(status: string): SessionStatus {
       return "waiting_room";
     default:
       return "none";
-  }
-}
-
-export function sessionEndsAdmission(status: SessionStatus): boolean {
-  switch (status) {
-    case "rate_limited":
-    case "spend_limited":
-    case "ip_capped":
-    case "banned":
-    case "country_blocked":
-      return true;
-    case "none":
-    case "active":
-    case "ended":
-    case "model_locked":
-    case "waiting_room":
-      return false;
-    default:
-      return assertNever(status);
   }
 }

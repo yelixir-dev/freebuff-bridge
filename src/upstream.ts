@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
+import type { Readable } from "node:stream";
 
-import { UpstreamError } from "./errors.js";
+import {
+  EmptyVisibleResponseError,
+  InvalidUpstreamResponseError,
+  UpstreamError,
+} from "./errors.js";
 import { chatMetadata, officialChatHeaders, stripSampling } from "./identity.js";
 import type { OpenAIChatCompletionRequest } from "./types.js";
 
@@ -10,7 +15,51 @@ export interface UpstreamTransport {
     readonly headers: Record<string, string>;
     readonly body: unknown;
     readonly stream: boolean;
-  }): Promise<{ readonly status: number; readonly json?: unknown; readonly text?: string }>;
+  }): Promise<{
+    readonly status: number;
+    readonly json?: unknown;
+    readonly text?: string;
+    readonly stream?: Readable;
+  }>;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isValidToolCall(value: unknown): boolean {
+  if (!isRecord(value) || value["type"] !== "function") return false;
+  if (typeof value["id"] !== "string" || !value["id"]) return false;
+  const fn = value["function"];
+  return (
+    isRecord(fn) &&
+    typeof fn["name"] === "string" &&
+    fn["name"].length > 0 &&
+    typeof fn["arguments"] === "string"
+  );
+}
+
+function assertVisibleCompletion(json: unknown): void {
+  if (!isRecord(json)) throw new InvalidUpstreamResponseError();
+  if (isRecord(json["error"])) {
+    const message =
+      typeof json["error"]["message"] === "string"
+        ? json["error"]["message"]
+        : "Freebuff upstream returned an application error";
+    throw new UpstreamError(message, 502);
+  }
+  if (!Array.isArray(json["choices"]) || json["choices"].length === 0) {
+    throw new InvalidUpstreamResponseError();
+  }
+  const choice = json["choices"][0];
+  if (!isRecord(choice)) throw new InvalidUpstreamResponseError();
+  const message = choice["message"];
+  if (!isRecord(message)) throw new InvalidUpstreamResponseError();
+  const content = typeof message["content"] === "string" ? message["content"] : "";
+  const toolCalls = Array.isArray(message["tool_calls"]) ? message["tool_calls"] : [];
+  if (content.trim().length === 0 && !toolCalls.some(isValidToolCall)) {
+    throw new EmptyVisibleResponseError();
+  }
 }
 
 export async function forwardChat(input: {
@@ -20,7 +69,12 @@ export async function forwardChat(input: {
   readonly instanceId: string;
   readonly request: OpenAIChatCompletionRequest;
   readonly clientId: string;
-}): Promise<{ readonly status: number; readonly json?: unknown; readonly text?: string }> {
+}): Promise<{
+  readonly status: number;
+  readonly json?: unknown;
+  readonly text?: string;
+  readonly stream?: Readable;
+}> {
   const cleaned = stripSampling({ ...input.request });
   const body = {
     ...cleaned,
@@ -43,5 +97,6 @@ export async function forwardChat(input: {
   if (response.status >= 400) {
     throw new UpstreamError(`Freebuff chat failed: ${response.status}`, response.status);
   }
+  if (!input.request.stream) assertVisibleCompletion(response.json);
   return response;
 }

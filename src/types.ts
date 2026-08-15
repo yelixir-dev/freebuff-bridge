@@ -1,10 +1,20 @@
 export type OpenAIRole = "developer" | "system" | "user" | "assistant" | "tool";
 
+export interface OpenAIToolCall {
+  readonly id?: string;
+  readonly type: "function";
+  readonly function: {
+    readonly name: string;
+    readonly arguments: string;
+  };
+}
+
 export interface OpenAIChatMessage {
   readonly role: OpenAIRole;
   readonly content?: string | ReadonlyArray<Record<string, unknown>> | null;
   readonly name?: string;
   readonly tool_call_id?: string;
+  readonly tool_calls?: readonly OpenAIToolCall[];
 }
 
 export interface OpenAIChatCompletionRequest {
@@ -15,6 +25,7 @@ export interface OpenAIChatCompletionRequest {
   readonly temperature?: number;
   readonly top_p?: number;
   readonly tools?: readonly unknown[];
+  readonly tool_choice?: unknown;
   readonly stream_options?: { readonly include_usage?: boolean };
 }
 

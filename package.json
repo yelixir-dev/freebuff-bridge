@@ -6,7 +6,8 @@
   "license": "MIT",
   "author": "Yorha Workspace",
   "bin": {
-    "freebuff-bridge": "dist/index.js"
+    "freebuff-bridge": "dist/index.js",
+    "freebuff-token": "scripts/freebuff-token.mjs"
   },
   "engines": {
     "node": ">=20.0.0"
@@ -16,6 +17,7 @@
     "build": "npm run clean && tsc -p tsconfig.build.json && node -e \"import('node:fs').then(fs=>{fs.chmodSync('dist/index.js',0o755)})\"",
     "clean": "node -e \"import('node:fs').then(fs=>{fs.rmSync('dist',{recursive:true,force:true});fs.rmSync('.vitest-tmp',{recursive:true,force:true});})\"",
     "start": "node dist/index.js",
+    "token": "node scripts/freebuff-token.mjs",
     "test": "mkdir -p .vitest-tmp && TMPDIR=$PWD/.vitest-tmp vitest run --pool=threads --maxWorkers=1",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",

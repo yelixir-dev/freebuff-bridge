@@ -1,0 +1,15 @@
+[Unit]
+Description=Freebuff Bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bridge
+WorkingDirectory=/opt/freebuff-bridge
+EnvironmentFile=/opt/freebuff-bridge/.env
+ExecStart=/usr/bin/node /opt/freebuff-bridge/dist/index.js
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

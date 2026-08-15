@@ -21,6 +21,9 @@ export const translations = {
     defaultThinLong: "기본값: 가늘고 길게",
     quotaNote: "세션 장이 소진된 계정은 리셋 시각까지 건너뛰고 다음 계정으로 넘어갑니다.",
     credentials: "자격 증명",
+    credHelpAria: "자격 증명 추가 방법",
+    credHelp:
+      '공식 CLI의 authToken을 넣습니다. 위 sk- 칸(BRIDGE_API_KEY)과 다른 키입니다.\n\n1. 맥에서 freebuff login 후 ~/.config/manicode/credentials.json의 authToken을 아래 칸에 붙여넣고 키 추가. GitHub 계정마다 반복.\n2. .env의 FREEBUFF_AUTH_TOKENS에 쉼표로 여러 개를 넣으면 재시작 후에도 남습니다.\n3. FREEBUFF_CREDENTIALS_PATH JSON — { "accounts": [ { "authToken": "…" } ] } 또는 이름 붙은 객체.\n\n대시보드로 넣은 토큰은 재시작 전 메모리에만 있습니다. 원격에는 토큰만 복사하고, 브릿지가 쓰는 동안 같은 계정으로 맥 CLI를 켜지 마세요.',
     refresh: "새로고침",
     addKey: "키 추가",
     pasteToken: "authToken 붙여넣기",
@@ -68,6 +71,9 @@ export const translations = {
     defaultThinLong: "default: thin and long",
     quotaNote: "Accounts that have spent their session tickets are skipped until resetAt.",
     credentials: "Credentials",
+    credHelpAria: "How to add credentials",
+    credHelp:
+      'Paste an official CLI authToken. This is not the sk- BRIDGE_API_KEY above.\n\n1. After freebuff login on a Mac, copy authToken from ~/.config/manicode/credentials.json, paste it below, and add the key. Repeat per GitHub account.\n2. Put comma-separated tokens in FREEBUFF_AUTH_TOKENS in .env to keep them across restarts.\n3. Point FREEBUFF_CREDENTIALS_PATH at JSON — { "accounts": [ { "authToken": "…" } ] } or named objects.\n\nDashboard-added tokens live in memory until restart. Copy tokens only to a remote host, and do not run the Mac CLI on the same account while the bridge uses it.',
     refresh: "Refresh",
     addKey: "Add key",
     pasteToken: "Paste authToken",
@@ -118,6 +124,9 @@ export const translations = {
     defaultThinLong: "默认：细而长",
     quotaNote: "会话配额用尽的账号会跳到 resetAt 之后再使用。",
     credentials: "凭据",
+    credHelpAria: "如何添加凭据",
+    credHelp:
+      '填写官方 CLI 的 authToken。这与上方 sk- 的 BRIDGE_API_KEY 不是同一把钥匙。\n\n1. 在 Mac 上 freebuff login 后，从 ~/.config/manicode/credentials.json 复制 authToken，粘贴到下方并添加密钥。每个 GitHub 账号重复一次。\n2. 把逗号分隔的令牌写入 .env 的 FREEBUFF_AUTH_TOKENS，重启后仍会保留。\n3. 让 FREEBUFF_CREDENTIALS_PATH 指向 JSON — { "accounts": [ { "authToken": "…" } ] } 或带名称的对象。\n\n仪表盘添加的令牌只存在于重启前的内存。远程主机只复制令牌，并且桥接使用该账号时不要同时开 Mac CLI。',
     refresh: "刷新",
     addKey: "添加密钥",
     pasteToken: "粘贴 authToken",

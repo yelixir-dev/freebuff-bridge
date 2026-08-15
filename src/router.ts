@@ -62,9 +62,10 @@ export function markQuotaFailure(
   state: CredentialState,
   snapshot: SessionSnapshot,
   now: number,
+  fallbackMs = 60_000,
 ): void {
   state.session = snapshot;
-  state.disabledUntil = cooldownUntil(snapshot, now);
+  state.disabledUntil = cooldownUntil(snapshot, now, fallbackMs);
 }
 
 export function redactedPreview(token: string): string {

@@ -1,5 +1,6 @@
 import { classifySessionStatus } from "./quota.js";
 import { officialSessionHeaders } from "./identity.js";
+import { UpstreamError } from "./errors.js";
 import type { SessionRateLimit, SessionSnapshot } from "./types.js";
 
 export interface SessionTransport {
@@ -93,6 +94,9 @@ export class FreebuffSessionClient {
       headers: { ...headers },
     });
     if (response.status === 404) return { status: "none" };
+    if (response.status >= 400) {
+      throw new UpstreamError(`Freebuff session failed: ${response.status}`, response.status);
+    }
     return parseSessionSnapshot(response.json);
   }
 }

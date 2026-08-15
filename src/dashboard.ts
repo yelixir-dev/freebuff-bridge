@@ -72,7 +72,7 @@ export function dashboardHtml(initialConfig: unknown = null): string {
         </div>
       </section>
       <section class="card wide">
-        <h2><span data-i18n="credentials">자격 증명</span> <span class="row"><button id="refreshCreds" class="secondary" type="button" data-i18n="refresh">새로고침</button></span></h2>
+        <h2><span class="card-title"><span data-i18n="credentials">자격 증명</span><button id="credHelp" class="info heading-info" type="button" aria-expanded="false" data-i18n-aria="credHelpAria" aria-label="자격 증명 추가 방법">i<span class="tip" data-i18n="credHelp"></span></button></span> <span class="row"><button id="refreshCreds" class="secondary" type="button" data-i18n="refresh">새로고침</button></span></h2>
         <div class="add-row">
           <input id="newToken" type="password" autocomplete="off" data-i18n-placeholder="pasteToken" placeholder="authToken 붙여넣기" />
           <button id="addCred" class="secondary" type="button" data-i18n="addKey">키 추가</button>
@@ -98,7 +98,7 @@ export function dashboardHtml(initialConfig: unknown = null): string {
     const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (ch) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;","'":"&#39;"}[ch]));
     let stored = localStorage.getItem("dashboardLang") || "";
     let activeLang = stored.startsWith("en") ? "en" : stored.startsWith("zh") ? "zh" : "ko";
-    let cfg = initialConfig, dirty = false;
+    let cfg = initialConfig, dirty = false, adminAuthKey = "";
     const tr = (key) => translations[activeLang]?.[key] ?? translations.ko[key] ?? key;
     function markDirty(value) {
       dirty = value;
@@ -121,7 +121,7 @@ export function dashboardHtml(initialConfig: unknown = null): string {
     function toast(text) { const el = $("toast"); el.textContent = text; el.classList.add("show"); setTimeout(() => el.classList.remove("show"), 2200); }
     async function api(path, opt = {}) {
       const headers = { "content-type": "application/json" };
-      const key = fullBridgeKey();
+      const key = adminAuthKey || fullBridgeKey();
       if (key) headers.authorization = "Bearer " + key;
       const res = await fetch(path, { cache: "no-store", headers, ...opt });
       if (!res.ok) throw new Error(await res.text());
@@ -178,17 +178,34 @@ export function dashboardHtml(initialConfig: unknown = null): string {
       crypto.getRandomValues(bytes);
       return 'sk-fbbr-' + Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
     }
-    $("genKey").onclick = () => { const key = randomBridgeKey(); cfg.bridgeApiKey = key; $('bridgeApiKey').value = displayBridgeKey(key); markDirty(true); toast(tr('generateClientApiKey')); };
+    $("genKey").onclick = () => { const key = randomBridgeKey(); if (cfg) cfg.bridgeApiKey = key; $('bridgeApiKey').value = displayBridgeKey(key); markDirty(true); toast(tr('generateClientApiKey')); };
     $("copyKey").onclick = async () => {
       const key = fullBridgeKey();
       if (!key) { toast(tr('clientKeyEmpty')); return; }
       await navigator.clipboard.writeText(key);
       toast(tr('copyClientApiKey'));
     };
-    $("saveKey").onclick = () => { cfg.bridgeApiKey = fullBridgeKey(); markDirty(true); toast(tr('saveClientApiKey')); };
+    $("saveKey").onclick = async () => {
+      const key = fullBridgeKey();
+      if (!key) { toast(tr('clientKeyEmpty')); return; }
+      adminAuthKey = key;
+      if (!cfg) {
+        cfg = await api("/admin/config");
+        const snap = await api("/admin/freebuff/credentials?refresh=true");
+        cfg.credentials = snap.credentials;
+        $("dot").className = "dot on";
+        $("online").dataset.state = "online";
+        $("online").textContent = tr("online");
+        applyLang();
+        toast(tr("online"));
+        return;
+      }
+      cfg.bridgeApiKey = key; markDirty(true); toast(tr('saveClientApiKey'));
+    };
     $("save").onclick = async () => {
       const pendingKey = fullBridgeKey();
       cfg = await api("/admin/config", { method: "PUT", body: JSON.stringify({ server: cfg.server, routing: cfg.routing, models: cfg.models, ...(pendingKey ? { bridgeApiKey: pendingKey } : {}) }) });
+      if (pendingKey) adminAuthKey = pendingKey;
       markDirty(true); applyLang(); toast(tr("saveJson"));
     };
     $("restart").onclick = async () => { await api("/admin/restart", { method: "POST", body: "{}" }); toast(tr("restartBridge")); };
@@ -202,6 +219,14 @@ export function dashboardHtml(initialConfig: unknown = null): string {
       const snap = await api("/admin/freebuff/credentials", { method: "POST", body: JSON.stringify({ authToken: token }) });
       cfg.credentials = snap.credentials; $("newToken").value = ""; markDirty(true); applyLang(); toast(tr("addKey"));
     };
+    const credHelp = $("credHelp");
+    function setCredHelp(open) {
+      credHelp.classList.toggle("open", open);
+      credHelp.setAttribute("aria-expanded", String(open));
+    }
+    credHelp.onclick = (event) => { event.stopPropagation(); setCredHelp(!credHelp.classList.contains("open")); };
+    document.addEventListener("click", (event) => { if (!credHelp.contains(event.target)) setCredHelp(false); });
+    document.addEventListener("keydown", (event) => { if (event.key === "Escape") setCredHelp(false); });
     applyLang();
     (async () => {
       try {

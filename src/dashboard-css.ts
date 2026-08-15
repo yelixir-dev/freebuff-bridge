@@ -58,8 +58,12 @@ input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visi
 .policy b{display:block;font-size:15px}
 .info{position:relative;font-size:16px;line-height:1;cursor:help;color:var(--teal);display:inline-flex}
 .info .tip{display:none;position:absolute;right:0;top:24px;z-index:5;width:min(72vw,320px);border:1px solid var(--line);background:var(--paper);color:var(--ink);box-shadow:var(--shadow);padding:10px;font:12px/1.45 var(--sans)}
-.info:hover .tip,.info:focus .tip{display:block}
+.info:hover .tip,.info:focus .tip,.info.open .tip{display:block}
 .info .tip .token{color:var(--muted)}
+.card-title{display:inline-flex;align-items:center;gap:8px;position:relative}
+.heading-info{min-height:22px;min-width:22px;height:22px;width:22px;padding:0;border:1px solid var(--teal);background:var(--paper);color:var(--teal);font:800 12px/1 var(--sans);text-transform:none;letter-spacing:0;display:inline-grid;place-items:center}
+.heading-info .tip{left:0;right:auto;top:calc(100% + 8px);width:min(92vw,440px);white-space:pre-line;text-align:left}
+.heading-info:not(.open):not(:focus-visible) .tip{display:none}
 .routing-guidance{margin:0 0 10px;border-top:1px solid var(--gold);border-left:3px solid var(--rust);background:var(--paper);color:var(--teal);padding:8px 10px;font:700 12px/1.45 var(--sans);text-align:left}
 .kv{display:grid;grid-template-columns:1fr auto;gap:4px;font-family:var(--sans);font-size:12px;border-bottom:1px solid var(--line);padding:5px 0}
 .stack{display:grid;gap:10px}

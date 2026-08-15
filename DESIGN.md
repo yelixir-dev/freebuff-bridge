@@ -30,6 +30,7 @@ Rules use `#d9d0c4`; muted copy uses `#6d665e`. Shadows stay restrained at `0 14
 - The dark hero includes a low-opacity inset hairline frame. Its metadata uses gold and rust accents.
 - The title and language flags share one `.brand-row`. Bind host and port share `.bind-grid`. The client key uses the `sk-` prefix chrome and generate/copy/save icons from CommandCode Bridge.
 - Concurrent-cap input is `[hidden]` unless the policy is `short_thick`. Author `display` rules must not override `[hidden]`.
+- The credentials heading has a click-to-toggle `[i]` (`#credHelp`) that explains how to add `authToken`s. Hover does not pin it; Escape and outside click close it.
 - Cards use the paper surface, a dark top rule, and one restrained shadow. Avoid nested ornamental containers.
 - Use the 4/8/12/16/24/32px rhythm. Dense controls may use the smaller steps; primary sections use 16px or more.
 - Controls are square-edged editorial elements, not pills. Borders and spacing establish hierarchy before color.

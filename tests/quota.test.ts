@@ -5,7 +5,6 @@ import {
   cooldownUntil,
   isQuotaExhausted,
   remainingSessions,
-  sessionEndsAdmission,
 } from "../src/quota.js";
 import type { SessionSnapshot } from "../src/types.js";
 
@@ -41,14 +40,6 @@ describe("classifySessionStatus", () => {
   it("collapses waiting-room variants", () => {
     expect(classifySessionStatus("waiting_room_required")).toBe("waiting_room");
     expect(classifySessionStatus("waiting_room_queued")).toBe("waiting_room");
-  });
-});
-
-describe("sessionEndsAdmission", () => {
-  it("blocks rotation-worthy statuses and keeps live sessions", () => {
-    expect(sessionEndsAdmission("rate_limited")).toBe(true);
-    expect(sessionEndsAdmission("active")).toBe(false);
-    expect(sessionEndsAdmission("waiting_room")).toBe(false);
   });
 });
 

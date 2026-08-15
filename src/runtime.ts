@@ -1,5 +1,7 @@
 import { accountsFromTokens, loadCredentialsFile } from "./credentials.js";
-import { remainingSessions, quotaForModel, sessionEndsAdmission } from "./quota.js";
+import { UpstreamError } from "./errors.js";
+import { readBoundedText } from "./http-body.js";
+import { cooldownUntil, isQuotaExhausted, quotaForModel, remainingSessions } from "./quota.js";
 import {
   markQuotaFailure,
   markReleased,
@@ -82,35 +84,67 @@ export class BridgeRuntime {
           ...(instanceId ? { instanceId } : {}),
           compact: false,
         });
+        state.disabledUntil = isQuotaExhausted(state.session, this.config.defaultModel)
+          ? cooldownUntil(state.session, Date.now(), this.config.cooldownMs)
+          : 0;
       }),
     );
   }
 
-  public async admit(model: string, now = Date.now()): Promise<CredentialState> {
-    const exclude = new Set<string>();
+  public async admit(
+    model: string,
+    now = Date.now(),
+    excluded: ReadonlySet<string> = new Set(),
+  ): Promise<CredentialState> {
+    const exclude = new Set(excluded);
+    let lastError: UpstreamError | undefined;
+    for (const state of this.states) {
+      if (state.disabledUntil <= now && isQuotaExhausted(state.session, model)) {
+        state.disabledUntil = 0;
+        state.session = undefined;
+      }
+    }
     while (true) {
-      const state = selectCredential(this.states, model, this.config.routingPolicy, now, {
-        excludeIds: exclude,
-        maxConcurrent: this.maxConcurrent(),
-      });
+      let state: CredentialState;
+      try {
+        state = selectCredential(this.states, model, this.config.routingPolicy, now, {
+          excludeIds: exclude,
+          maxConcurrent: this.maxConcurrent(),
+        });
+      } catch (error) {
+        throw lastError ?? error;
+      }
       markSelected(state, now);
       try {
         const live = state.session;
-        if (live?.status === "active" && live.model === model && live.instanceId) return state;
-        const admitted = await this.sessions.call("POST", state.account.authToken, { model });
-        state.session = admitted;
-        if (admitted.status === "active" && admitted.instanceId) return state;
-        if (sessionEndsAdmission(admitted.status)) {
-          markQuotaFailure(state, admitted, now);
+        if (live?.status === "active" && live.model === model && live.instanceId) {
+          const refreshed = await this.sessions.call("GET", state.account.authToken, {
+            instanceId: live.instanceId,
+            heartbeat: true,
+            compact: true,
+          });
+          state.session = refreshed;
+          if (refreshed.status === "active" && refreshed.model === model && refreshed.instanceId) {
+            return state;
+          }
+          markQuotaFailure(state, refreshed, now, this.config.cooldownMs);
           exclude.add(state.account.id);
           markReleased(state);
           continue;
         }
+        const admitted = await this.sessions.call("POST", state.account.authToken, { model });
+        state.session = admitted;
+        if (admitted.status === "active" && admitted.instanceId) return state;
+        markQuotaFailure(state, admitted, now, this.config.cooldownMs);
+        exclude.add(state.account.id);
         markReleased(state);
-        throw new Error(`session ${admitted.status}`);
+        continue;
       } catch (error) {
         markReleased(state);
-        throw error;
+        if (!(error instanceof UpstreamError)) throw error;
+        lastError = error;
+        state.disabledUntil = now + this.config.cooldownMs;
+        exclude.add(state.account.id);
       }
     }
   }
@@ -118,17 +152,37 @@ export class BridgeRuntime {
   public release(state: CredentialState): void {
     markReleased(state);
   }
+
+  public cooldown(state: CredentialState, now = Date.now()): void {
+    state.session = undefined;
+    state.disabledUntil = now + this.config.cooldownMs;
+  }
 }
 
-export function fetchSessionTransport(timeoutMs: number): SessionTransport {
+export function fetchSessionTransport(
+  timeoutMs: number,
+  maxResponseBytes = 1_048_576,
+): SessionTransport {
   return {
     async request({ method, url, headers }) {
-      const response = await fetch(url, {
-        method,
-        headers,
-        signal: AbortSignal.timeout(timeoutMs),
-      });
-      const json: unknown = await response.json().catch(() => ({}));
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          method,
+          headers,
+          signal: AbortSignal.timeout(timeoutMs),
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Freebuff session network failure";
+        throw new UpstreamError(message, 503);
+      }
+      const text = await readBoundedText(response, maxResponseBytes);
+      let json: unknown;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        json = {};
+      }
       return { status: response.status, json };
     },
   };

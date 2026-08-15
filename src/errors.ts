@@ -42,8 +42,38 @@ export class UpstreamError extends BridgeError {
   public readonly upstreamStatus: number;
 
   public constructor(message: string, upstreamStatus: number) {
-    super("upstream_error", message, 502);
+    const statusCode = upstreamStatus >= 400 && upstreamStatus <= 599 ? upstreamStatus : 502;
+    super("upstream_error", message, statusCode);
     this.name = "UpstreamError";
     this.upstreamStatus = upstreamStatus;
+  }
+}
+
+export class EmptyVisibleResponseError extends BridgeError {
+  public constructor() {
+    super(
+      "freebuff_empty_visible_response",
+      "Freebuff upstream returned no visible text or tool calls",
+      502,
+    );
+    this.name = "EmptyVisibleResponseError";
+  }
+}
+
+export class UnsupportedToolsError extends BridgeError {
+  public constructor() {
+    super(
+      "freebuff_tools_unsupported",
+      'Freebuff free-mode cannot safely execute client tools; omit tools or set tool_choice to "none"',
+      400,
+    );
+    this.name = "UnsupportedToolsError";
+  }
+}
+
+export class InvalidUpstreamResponseError extends BridgeError {
+  public constructor(message = "Freebuff upstream returned an invalid completion envelope") {
+    super("freebuff_invalid_response", message, 502);
+    this.name = "InvalidUpstreamResponseError";
   }
 }
