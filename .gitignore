@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.vitest-tmp/
+.env
+.env.*
+!.env.example
+*.log
+*.tgz
+.DS_Store
+npm-debug.log*
+.omo/
+.tmp/
