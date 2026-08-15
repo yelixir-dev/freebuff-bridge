@@ -112,6 +112,60 @@ describe("tool bridge", () => {
     ).toEqual({ seed: 7, factor: 6 });
   });
 
+  it("normalizes MiMo function and parameter tags", () => {
+    const bash = {
+      type: "function" as const,
+      function: {
+        name: "bash",
+        parameters: {
+          type: "object",
+          properties: {
+            command: { type: "string" },
+            description: { type: "string" },
+            timeout: { type: "number" },
+          },
+          required: ["command"],
+        },
+      },
+    };
+    const plan = planToolBridge(request({ tools: [bash], tool_choice: "required" }));
+    const completion = {
+      choices: [
+        {
+          message: {
+            role: "assistant",
+            content:
+              "<tool_call>\n<function=bash>\n" +
+              "<parameter=command>echo HELLO_MIMO</parameter>\n" +
+              "<parameter=description>MiMo tool call test</parameter>\n" +
+              "<parameter=timeout>120</parameter>\n" +
+              "</function>\n</tool_call>",
+          },
+          finish_reason: "stop",
+        },
+      ],
+    };
+
+    const normalized = normalizeToolCompletion(completion, plan) as typeof completion & {
+      choices: Array<{
+        message: {
+          content: string | null;
+          tool_calls: Array<{ function: { name: string; arguments: string } }>;
+        };
+        finish_reason: string;
+      }>;
+    };
+    const call = normalized.choices[0]?.message.tool_calls[0];
+    expect(normalized.choices[0]?.message.content).toBeNull();
+    expect(normalized.choices[0]?.finish_reason).toBe("tool_calls");
+    expect(call?.function.name).toBe("bash");
+    expect(JSON.parse(call?.function.arguments ?? "")).toEqual({
+      command: "echo HELLO_MIMO",
+      description: "MiMo tool call test",
+      timeout: 120,
+    });
+  });
+
   it("preserves ordinary text when automatic selection does not call a tool", () => {
     const plan = planToolBridge(request({ tools: [lookup], tool_choice: "auto" }));
     const completion = {

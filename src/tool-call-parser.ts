@@ -18,6 +18,18 @@ function dsmlParameterPattern(): RegExp {
   return /<｜｜DSML｜｜parameter\s+name=(?:"([^"]+)"|'([^']+)')[^>]*>([\s\S]*?)<\/｜｜DSML｜｜parameter>/g;
 }
 
+function genericToolPattern(): RegExp {
+  return /<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/g;
+}
+
+function genericFunctionPattern(): RegExp {
+  return /<function=([A-Za-z0-9_.-]+)\s*>([\s\S]*?)<\/function>/g;
+}
+
+function genericParameterPattern(): RegExp {
+  return /<parameter=([A-Za-z_][A-Za-z0-9_-]*)\s*>([\s\S]*?)<\/parameter>/g;
+}
+
 function parseRecord(value: string): Record<string, unknown> | undefined {
   try {
     const parsed: unknown = JSON.parse(value);
@@ -87,14 +99,39 @@ function dsmlCalls(content: string, allowedNames: ReadonlySet<string>): readonly
   return calls;
 }
 
+function genericCalls(
+  content: string,
+  allowedNames: ReadonlySet<string>,
+): readonly OpenAIToolCall[] {
+  const calls: OpenAIToolCall[] = [];
+  for (const block of content.matchAll(genericToolPattern())) {
+    for (const fn of (block[1] ?? "").matchAll(genericFunctionPattern())) {
+      const name = fn[1] ?? "";
+      if (!allowedNames.has(name)) continue;
+      const input: Record<string, unknown> = {};
+      for (const parameter of (fn[2] ?? "").matchAll(genericParameterPattern())) {
+        const parameterName = parameter[1] ?? "";
+        input[parameterName] = parseParameter(parameter[2] ?? "");
+      }
+      calls.push(toolCall(name, input));
+    }
+  }
+  return calls;
+}
+
 export function parseToolCallText(
   content: string,
   allowedNames: ReadonlySet<string>,
 ): { readonly calls: readonly OpenAIToolCall[]; readonly text: string } {
-  const calls = [...codebuffCalls(content, allowedNames), ...dsmlCalls(content, allowedNames)];
+  const calls = [
+    ...codebuffCalls(content, allowedNames),
+    ...dsmlCalls(content, allowedNames),
+    ...genericCalls(content, allowedNames),
+  ];
   const text = content
     .replace(codebuffPattern(), "")
     .replace(/<｜｜DSML｜｜tool_calls>[\s\S]*?<\/｜｜DSML｜｜tool_calls>/g, "")
+    .replace(genericToolPattern(), "")
     .trim();
   return { calls, text };
 }
